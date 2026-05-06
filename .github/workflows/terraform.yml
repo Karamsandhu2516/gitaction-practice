@@ -1,33 +1,52 @@
-name: "Terraform with Approval"
+name: "Terraform with Approval & Checklist"
 
 on:
   push:
     branches:
       - main
+  pull_request: # Also runs on PRs so you see the checklist results!
 
 jobs:
-  # JOB 1: Just calculate the changes
+  # JOB 1: THE CHECKLIST & PREVIEW
   terraform-plan:
     runs-on: ubuntu-latest
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-      - run: terraform init
-      - run: terraform plan
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-  # JOB 2: Wait for approval, then apply
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      # --- START OF CHECKLIST ---
+      - name: Terraform Format Check
+        run: terraform fmt -check
+        # Fails if code isn't formatted properly
+
+      - name: Terraform Validate
+        run: terraform validate
+        # Fails if there are syntax errors
+
+      - name: Terraform Plan
+        run: terraform plan
+      # --- END OF CHECKLIST ---
+
+  # JOB 2: THE EXECUTION (Only after approval)
   terraform-apply:
-    needs: terraform-plan   # This ensures Plan happens FIRST
+    needs: terraform-plan
     runs-on: ubuntu-latest
-    environment: prod # This triggers the "Manual Approval" gate!
+    environment: prod
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-      - run: terraform init
-      - run: terraform apply -auto-approve        
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+      - name: Terraform Init
+        run: terraform init
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
